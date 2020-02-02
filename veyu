@@ -1,0 +1,218 @@
+#!/usr/bin/python
+import os
+import sys
+import requests
+import wget
+
+def help():
+	print("""Veyu iOS Firmware Tool - @machport
+-r Install idevicerestore
+-s <ipsw path> Install ipsw
+-u <ipsw path> Perform update install with ipsw
+-le Erase and install latest firmware 
+-lu Update to latest firmware
+-i <Version> Download and erase install ipsw, Requires -d to be set
+-b <Version> Download iPSW for certain build, Requires -d to be set
+-d <Device ID> Set device identifier for use with other arguments
+-g <Version> Check signing status of firmware, Requires -d to be set'
+-h Show this help menu""")
+def main():
+	device = ""
+	try:
+		tmpa = sys.argv[1]
+	except Exception as e:
+		help()
+		exit()
+	c = 0
+	for i in sys.argv:
+		if i == "-r":
+			os.system("""/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"; export PKG_CONFIG_PATH=/usr/local/opt/openssl@1.1/lib/pkgconfig; brew install usbmuxd automake autoconf libtool pkg-config libplist libzip openssl libimobiledevice; mkdir idevicerestore_build && cd idevicerestore_build; git clone https://github.com/libimobiledevice/libirecovery.git && cd ./libirecovery && bash autogen.sh && make install; cd ..; git clone https://github.com/libimobiledevice/libusbmuxd.git && cd ./libusbmuxd && bash autogen.sh && make install; git clone https://github.com/libimobiledevice/idevicerestore.git && cd ./idevicerestore && bash autogen.sh && make install; cd ../../; rm -rf ./libusbmuxd/; rm -rf ./libirecovery; rm -rf ./idevicerestore_build; """)
+		if i == "-h":
+			help()
+			exit()
+		if i == "-le":
+			os.system("idevicerestore -e -l")
+		if i == "-lu":
+			os.system("idevicerestore -l")
+		if i == "-s":
+			os.system("idevicerestore -e" + sys.argv[c+1])
+		if i == "-u":
+			os.system("idevicerestore " + sys.argv[c+1])
+		if i == "-d":
+			device = sys.argv[c+1]
+		if i == "-g":
+			if device == "":
+				print("Please specifiy device with -d")
+				exit()
+			else:
+				r = requests.get("https://api.ipsw.me/v4/device/" + device + "?type=ipsw")
+				#print(r.text)
+				vexists = False
+				a = []
+				v = []
+				for i in r.text.split("}"):
+					a.append(i)
+				for i in a:
+					v.append(i.encode("utf-8").split("}"))
+				vc = 0
+				signed = False
+				for i in v:
+					if signed == False:
+						for i in i:
+							version = ""
+							vv = 0
+							for i in i.split(","):
+								if '"version"' in i:
+									if sys.argv[c+1] == i.split(":")[1].split('"')[1]:
+										version = sys.argv[c+1]
+										vv=version
+									else:
+										pass
+									vc +=1
+								if '"signed"' in i:
+									if vv == sys.argv[c+1]:
+										if i.split(":")[1] == "true":
+											print(version + " is signed")
+											vexists = True
+											signed = True
+										else:
+											print(version + " is not signed")
+											vexists = True
+											signed = False
+								if '"url"' in i:
+									if vv == sys.argv[c+1]:
+										print("url for ipsw: " + i.replace('"url":',"").replace('"',""))
+					else:
+						break
+				if vexists == False:
+					print("Version doesnt exist")
+		if i == "-b":
+			if device == "":
+				print("Please specifiy device with -d")
+				exit()
+			else:
+				r = requests.get("https://api.ipsw.me/v4/device/" + device + "?type=ipsw")
+				#print(r.text)
+				vexists = False
+				a = []
+				v = []
+				for i in r.text.split("}"):
+					a.append(i)
+				for i in a:
+					v.append(i.encode("utf-8").split("}"))
+				vc = 0
+				signed = False
+				url = ""
+				for i in v:
+					if signed == False:
+						for i in i:
+							version = ""
+							vv = 0
+							for i in i.split(","):
+								if '"version"' in i:
+									if sys.argv[c+1] == i.split(":")[1].split('"')[1]:
+										version = sys.argv[c+1]
+										vv=version
+									else:
+										pass
+									vc +=1
+								if '"signed"' in i:
+									if vv == sys.argv[c+1]:
+										if i.split(":")[1] == "true":
+											print(version + " is signed")
+											vexists = True
+											signed = True
+										else:
+											print(version + " is not signed")
+											vexists = True
+											signed = False
+								if '"url"' in i:
+									if vv == sys.argv[c+1]:
+										print("url for ipsw: " + i.replace('"url":',"").replace('"',""))
+										url = i.replace('"url":',"").replace('"',"")
+					else:
+						break
+				if vexists == False:
+					print("Version doesnt exist")
+				else:
+					if signed == False and vexists == True:
+						print("Version is unsigned, download anyways?, y/n")
+						choice = raw_input(":")
+						if choice == "y":
+							headers = {"Range": "bytes=0-100"}  # first 100 bytes
+							r = requests.get(url,headers=headers)
+							if "AccessDenied" in r.text:
+								print("This iPSW is currently not avalible for download due to apple not allowing downloads on many unsigned ipsw's, please try again at a different time")
+								exit()
+							print("Beginning iPSW download")
+							wget.download(url,"./Firmware.ipsw")
+					elif signed == True and vexists == True:
+						print("Beginning iPSW download")
+						wget.download(url,"./Firmware.ipsw")
+		if i == "-i":
+			if device == "":
+				print("Please specifiy device with -d")
+				exit()
+			else:
+				r = requests.get("https://api.ipsw.me/v4/device/" + device + "?type=ipsw")
+				#print(r.text)
+				vexists = False
+				a = []
+				v = []
+				for i in r.text.split("}"):
+					a.append(i)
+				for i in a:
+					v.append(i.encode("utf-8").split("}"))
+				vc = 0
+				signed = False
+				url = ""
+				for i in v:
+					if signed == False:
+						for i in i:
+							version = ""
+							vv = 0
+							for i in i.split(","):
+								if '"version"' in i:
+									if sys.argv[c+1] == i.split(":")[1].split('"')[1]:
+										version = sys.argv[c+1]
+										vv=version
+									else:
+										pass
+									vc +=1
+								if '"signed"' in i:
+									if vv == sys.argv[c+1]:
+										if i.split(":")[1] == "true":
+											print(version + " is signed")
+											vexists = True
+											signed = True
+										else:
+											print(version + " is not signed")
+											vexists = True
+											signed = False
+								if '"url"' in i:
+									if vv == sys.argv[c+1]:
+										print("url for ipsw: " + i.replace('"url":',"").replace('"',""))
+										url = i.replace('"url":',"").replace('"',"")
+					else:
+						break
+				if vexists == False:
+					print("Version doesnt exist")
+				else:
+					if signed == False and vexists == True:
+						print("Version is unsigned, download anyways?, y/n")
+						choice = raw_input(":")
+						if choice == "y":
+							headers = {"Range": "bytes=0-100"}  # first 100 bytes
+							r = requests.get(url,headers=headers)
+							if "AccessDenied" in r.text:
+								print("This iPSW is currently not avalible for download due to apple not allowing downloads on many unsigned ipsw's, please try again at a different time")
+								exit()
+							print("Beginning iPSW download")
+							wget.download(url,"./Firmware.ipsw")
+					elif signed == True and vexists == True:
+						print("Beginning iPSW download")
+						wget.download(url,"./Firmware.ipsw")
+						os.system("idevicerestore -e ./Firmware.ipsw")
+		c+=1
+if __name__ == '__main__':
+	main()
